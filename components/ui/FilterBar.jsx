@@ -1,17 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-
-const MONTH_NAMES = [
-  'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-  'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
-];
-
-function formatMonthLabel(monthStr) {
-  const [year, month] = monthStr.split('-');
-  const idx = parseInt(month, 10) - 1;
-  return `${MONTH_NAMES[idx] ?? month} ${year}`;
-}
+import { fmtMonth } from '@/lib/format';
 
 export default function FilterBar({
   months = [],
@@ -42,7 +32,7 @@ export default function FilterBar({
   }
 
   return (
-    <div className="flex flex-wrap items-center justify-between gap-4 rounded-sl-card border border-sl-border bg-sl-bg p-4">
+    <div className="flex flex-wrap items-center justify-between gap-4 rounded-sl-card border border-sl-border bg-sl-card p-4">
       <div className="flex flex-wrap items-center gap-3">
         <span className="whitespace-nowrap text-[11px] uppercase tracking-[0.07em] text-sl-muted">
           Period
@@ -62,7 +52,7 @@ export default function FilterBar({
                     : 'border-transparent bg-sl-purple-light text-sl-purple'
                 }`}
               >
-                {formatMonthLabel(month)}
+                {fmtMonth(month)}
               </button>
             );
           })}

@@ -12,6 +12,7 @@ module.exports = {
         'sl-purple-light': 'var(--sl-purple-light)',
         'sl-cream': 'var(--sl-cream)',
         'sl-bg': 'var(--sl-bg)',
+        'sl-card': 'var(--sl-card)',
         'sl-text': 'var(--sl-text)',
         'sl-muted': 'var(--sl-muted)',
         'sl-border': 'var(--sl-border)',

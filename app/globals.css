@@ -8,6 +8,7 @@
   --sl-purple-light: #EDE8EF;
   --sl-cream: #FDF0DD;
   --sl-bg: #FFFFFF;
+  --sl-card: #FFFFFF;
   --sl-text: #322D3C;
   --sl-muted: #6b6575;
   --sl-border: #e8e3ed;
@@ -16,6 +17,16 @@
   --sl-radius-button-secondary: 7px;
   --sl-radius-card: 8px;
   --sl-radius-pill: 4px;
+}
+
+/* Scoped dark-theme override — apply the `sl-theme-dark` class to a
+   wrapping element to flip all sl-* tokens for that subtree only. */
+.sl-theme-dark {
+  --sl-bg: #0e0e14;
+  --sl-card: #16161f;
+  --sl-border: #2a2a3a;
+  --sl-text: #f1eff5;
+  --sl-muted: #8b8696;
 }
 
 body {
