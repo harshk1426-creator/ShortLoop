@@ -255,7 +255,7 @@ export default function DealershipClient({ data }) {
     <div className="min-h-screen bg-sl-bg">
       <Topbar variant="dealership" dealerName={selectedDealer} />
 
-      <div className="mx-auto max-w-[1400px] space-y-6 p-6">
+      <div className="mx-auto max-w-[1400px] space-y-4 p-4 sm:space-y-6 sm:p-6">
         <div className="rounded-sl-card border border-sl-border bg-white p-4 shadow-[0_1px_3px_rgba(0,0,0,0.05)]">
           <div className="mb-3 text-xs font-semibold uppercase tracking-[0.1em] text-sl-muted">
             Select Dealership
@@ -298,7 +298,7 @@ export default function DealershipClient({ data }) {
           statusText={statusText}
         />
 
-        <div className="grid grid-cols-5 gap-4">
+        <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-5">
           <KPICard
             label="Total Calls"
             value={hasDealer ? totalCalls.toLocaleString() : '—'}
@@ -346,7 +346,7 @@ export default function DealershipClient({ data }) {
 
         <SectionLabel>Success Rates</SectionLabel>
 
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <ChartCard eyebrow="Success Rate" title="By Agent Type" accentColor="#673D7D">
             {hasDealer ? <PercentBarChart data={agentTypeData} color="#673D7D" /> : <EmptyState />}
           </ChartCard>
@@ -382,7 +382,7 @@ export default function DealershipClient({ data }) {
           )}
         </ChartCard>
 
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <ChartCard eyebrow="Monthly Trend" title="Abandonment Rate" accentColor="#e11d48">
             {hasDealer ? (
               <TrendLineChart
@@ -557,7 +557,7 @@ function CampaignTable({ campaigns }) {
 
   return (
     <div className="overflow-x-auto">
-      <table className="w-full border-collapse text-sm">
+      <table className="w-full min-w-[560px] border-collapse text-sm">
         <thead>
           <tr className="border-b border-sl-border text-left text-[11px] uppercase tracking-[0.05em] text-sl-muted">
             <th className="px-3 py-2 font-semibold">Campaign</th>

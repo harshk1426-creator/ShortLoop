@@ -33,7 +33,7 @@ export default function FilterBar({
 
   return (
     <div
-      className="flex flex-wrap items-center justify-between gap-4 rounded-sl-card border border-sl-border p-4"
+      className="flex flex-col gap-3 rounded-sl-card border border-sl-border p-4 sm:flex-row sm:items-center sm:justify-between sm:gap-4"
       style={{ backgroundColor: 'var(--sl-filterbar-bg)' }}
     >
       <div className="flex flex-wrap items-center gap-3">
@@ -62,7 +62,7 @@ export default function FilterBar({
         </div>
       </div>
 
-      <div className="flex items-center gap-3">
+      <div className="flex flex-wrap items-center gap-2 sm:gap-3">
         <button
           type="button"
           onClick={handleApply}

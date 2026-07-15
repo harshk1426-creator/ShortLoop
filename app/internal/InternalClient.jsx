@@ -193,7 +193,7 @@ export default function InternalClient({ data }) {
   const statusText = `Showing ${totalCalls.toLocaleString()} calls`;
 
   return (
-    <div className="mx-auto max-w-[1400px] space-y-6 p-6">
+    <div className="mx-auto max-w-[1400px] space-y-4 p-4 sm:space-y-6 sm:p-6">
       <FilterBar
         months={allMonths}
         selected={selected}
@@ -202,7 +202,7 @@ export default function InternalClient({ data }) {
         statusText={statusText}
       />
 
-      <div className="grid grid-cols-6 gap-4">
+      <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-6">
         <KPICard
           label="Total Calls"
           value={totalCalls.toLocaleString()}
@@ -255,7 +255,7 @@ export default function InternalClient({ data }) {
 
       <SectionLabel>Success Rates</SectionLabel>
 
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <ChartCard eyebrow="Success Rate" title="By Agent Type" accentColor="#673D7D">
           <PercentBarChart data={agentTypeData} color="#673D7D" isDark />
         </ChartCard>
@@ -320,7 +320,7 @@ export default function InternalClient({ data }) {
         />
       </ChartCard>
 
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <ChartCard eyebrow="Monthly Trend" title="Abandonment Rate" accentColor="#e11d48">
           <TrendLineChart
             data={abandonmentTrend}
