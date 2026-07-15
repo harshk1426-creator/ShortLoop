@@ -17,6 +17,8 @@
   --sl-radius-button-secondary: 7px;
   --sl-radius-card: 8px;
   --sl-radius-pill: 4px;
+
+  --sl-filterbar-bg: #faf8fc;
 }
 
 /* Scoped dark-theme override — apply the `sl-theme-dark` class to a
@@ -27,6 +29,11 @@
   --sl-border: #2a2a3a;
   --sl-text: #f1eff5;
   --sl-muted: #8b8696;
+  --sl-filterbar-bg: var(--sl-card);
+}
+
+.sl-theme-dark .sl-card-glow {
+  background-image: radial-gradient(circle at 100% 0%, rgba(103, 61, 125, 0.03), transparent 60%);
 }
 
 body {

@@ -6,6 +6,7 @@ import {
   BarChart,
   Bar,
   Cell,
+  LabelList,
   LineChart,
   Line,
   XAxis,
@@ -18,7 +19,14 @@ import KPICard from '@/components/ui/KPICard';
 import ChartCard from '@/components/ui/ChartCard';
 import SectionLabel from '@/components/ui/SectionLabel';
 import { fmtMonth } from '@/lib/format';
-import { pctNum, fmtSecs, fmtRevenue, successRateByGroup, monthlyAvgTrend } from '@/lib/metrics';
+import {
+  pctNum,
+  fmtSecs,
+  fmtRevenue,
+  successRateWithShare,
+  monthlyAvgTrend,
+  computeKPITrend,
+} from '@/lib/metrics';
 
 const AGENT_TYPES = ['Service AI', 'Sales AI', 'Outbound AI'];
 const CHANNELS = ['Call', 'Text', 'Email'];
@@ -53,10 +61,6 @@ const TOOLTIP_STYLE = {
 };
 const TOOLTIP_LABEL_STYLE = { color: '#f1eff5' };
 const TOOLTIP_CURSOR = { fill: 'rgba(255,255,255,0.04)' };
-
-function pctTooltipFormatter(value) {
-  return [`${value.toFixed(1)}%`, 'Success Rate'];
-}
 
 export default function InternalClient({ data }) {
   const [selected, setSelected] = useState([]);
@@ -105,28 +109,59 @@ export default function InternalClient({ data }) {
   const abandonedRate = pctNum(abandonedCount, totalCalls);
   const escalatedRate = pctNum(escalatedCount, totalCalls);
 
+  const successTrend = useMemo(
+    () =>
+      computeKPITrend(
+        data, allMonths, selected,
+        (rows) => pctNum(rows.filter((r) => r.Success === 'Yes').length, rows.length),
+        true
+      ),
+    [data, allMonths, selected]
+  );
+  const abandonedTrend = useMemo(
+    () =>
+      computeKPITrend(
+        data, allMonths, selected,
+        (rows) => pctNum(rows.filter((r) => r['Call Abandoned'] === 'Yes').length, rows.length),
+        false
+      ),
+    [data, allMonths, selected]
+  );
+  const escalatedTrend = useMemo(
+    () =>
+      computeKPITrend(
+        data, allMonths, selected,
+        (rows) => pctNum(rows.filter((r) => r['Escalated to Human'] === 'Yes').length, rows.length),
+        false
+      ),
+    [data, allMonths, selected]
+  );
+
   const agentTypeData = useMemo(
-    () => successRateByGroup(filteredRows, 'Type of Agent', AGENT_TYPES),
+    () => successRateWithShare(filteredRows, 'Type of Agent', AGENT_TYPES),
     [filteredRows]
   );
   const channelData = useMemo(
-    () => successRateByGroup(filteredRows, 'Channel', CHANNELS),
+    () => successRateWithShare(filteredRows, 'Channel', CHANNELS),
     [filteredRows]
   );
   const languageData = useMemo(
-    () => successRateByGroup(filteredRows, 'Language', LANGUAGES),
+    () => successRateWithShare(filteredRows, 'Language', LANGUAGES),
     [filteredRows]
   );
-
-  const timeOfDayData = useMemo(
-    () =>
-      TIME_SLOTS.map((slot) => {
-        const slotRows = filteredRows.filter((r) => getTimeSlot(r['Time']) === slot);
-        const successes = slotRows.filter((r) => r.Success === 'Yes').length;
-        return { name: slot, value: pctNum(successes, slotRows.length) };
-      }),
-    [filteredRows]
-  );
+  const timeOfDayData = useMemo(() => {
+    const total = filteredRows.length;
+    return TIME_SLOTS.map((slot) => {
+      const slotRows = filteredRows.filter((r) => getTimeSlot(r['Time']) === slot);
+      const successes = slotRows.filter((r) => r.Success === 'Yes').length;
+      return {
+        name: slot,
+        successRate: pctNum(successes, slotRows.length),
+        callShare: pctNum(slotRows.length, total),
+        totalCalls: slotRows.length,
+      };
+    });
+  }, [filteredRows]);
 
   const dealershipData = useMemo(
     () =>
@@ -146,12 +181,10 @@ export default function InternalClient({ data }) {
     () => monthlyAvgTrend(data, allMonths, selected, (r) => (r.duration_secs || 0) / 60),
     [data, allMonths, selected]
   );
-
   const abandonmentTrend = useMemo(
     () => monthlyAvgTrend(data, allMonths, selected, (r) => (r['Call Abandoned'] === 'Yes' ? 100 : 0)),
     [data, allMonths, selected]
   );
-
   const escalationTrend = useMemo(
     () => monthlyAvgTrend(data, allMonths, selected, (r) => (r['Escalated to Human'] === 'Yes' ? 100 : 0)),
     [data, allMonths, selected]
@@ -175,59 +208,71 @@ export default function InternalClient({ data }) {
           value={totalCalls.toLocaleString()}
           sub="in selected period"
           accent="#673D7D"
+          valueFontSize={32}
         />
         <KPICard
           label="Success Rate"
           value={`${successRate.toFixed(1)}%`}
           sub={`${successCount.toLocaleString()} successful`}
           accent="#059669"
+          trend={successTrend}
+          valueFontSize={32}
+          valueGlow
         />
         <KPICard
           label="Avg Duration"
           value={fmtSecs(avgDurationSecs)}
           sub="per call"
           accent="#0d9488"
+          valueFontSize={32}
         />
         <KPICard
           label="Abandoned"
           value={`${abandonedRate.toFixed(1)}%`}
           sub={`${abandonedCount.toLocaleString()} calls`}
           accent="#e11d48"
+          trend={abandonedTrend}
+          valueFontSize={32}
+          valueGlow
         />
         <KPICard
           label="Escalated"
           value={`${escalatedRate.toFixed(1)}%`}
           sub={`${escalatedCount.toLocaleString()} calls`}
           accent="#d97706"
+          trend={escalatedTrend}
+          valueFontSize={32}
+          valueGlow
         />
         <KPICard
           label="Total Revenue"
           value={fmtRevenue(totalRevenue)}
           sub="estimated"
           accent="#6b7280"
+          valueFontSize={32}
         />
       </div>
 
       <SectionLabel>Success Rates</SectionLabel>
 
       <div className="grid grid-cols-2 gap-4">
-        <ChartCard eyebrow="Success Rate" title="By Agent Type">
-          <PercentBarChart data={agentTypeData} color="#673D7D" />
+        <ChartCard eyebrow="Success Rate" title="By Agent Type" accentColor="#673D7D">
+          <PercentBarChart data={agentTypeData} color="#673D7D" isDark />
         </ChartCard>
-        <ChartCard eyebrow="Success Rate" title="By Channel">
-          <PercentBarChart data={channelData} color="#0d9488" />
+        <ChartCard eyebrow="Success Rate" title="By Channel" accentColor="#0d9488">
+          <PercentBarChart data={channelData} color="#0d9488" isDark />
         </ChartCard>
-        <ChartCard eyebrow="Success Rate" title="By Language">
-          <PercentBarChart data={languageData} color="#d97706" />
+        <ChartCard eyebrow="Success Rate" title="By Language" accentColor="#d97706">
+          <PercentBarChart data={languageData} color="#d97706" isDark />
         </ChartCard>
-        <ChartCard eyebrow="By Time of Day" title="Success Rate by Hour Slot">
-          <PercentBarChart data={timeOfDayData} color="#8b5cf6" radius={[6, 6, 6, 6]} />
+        <ChartCard eyebrow="By Time of Day" title="Success Rate by Hour Slot" accentColor="#8b5cf6">
+          <PercentBarChart data={timeOfDayData} color="#8b5cf6" radius={[6, 6, 6, 6]} isDark />
         </ChartCard>
       </div>
 
       <SectionLabel>Dealership Comparison</SectionLabel>
 
-      <ChartCard eyebrow="Success Rate" title="By Dealership">
+      <ChartCard eyebrow="Success Rate" title="By Dealership" accentColor="#673D7D">
         <ResponsiveContainer width="100%" height={380}>
           <BarChart data={dealershipData} layout="vertical" margin={{ top: 4, right: 24, bottom: 4, left: 8 }}>
             <CartesianGrid stroke={GRID_STROKE} strokeDasharray="3 3" horizontal={false} />
@@ -250,10 +295,10 @@ export default function InternalClient({ data }) {
             <Tooltip
               contentStyle={TOOLTIP_STYLE}
               labelStyle={TOOLTIP_LABEL_STYLE}
-              formatter={pctTooltipFormatter}
+              formatter={(value) => [`${value.toFixed(1)}%`, 'Success Rate']}
               cursor={TOOLTIP_CURSOR}
             />
-            <Bar dataKey="value" radius={[0, 4, 4, 0]}>
+            <Bar dataKey="value" radius={[0, 4, 4, 0]} animationDuration={800} animationEasing="ease-out">
               {dealershipData.map((entry) => (
                 <Cell key={entry.name} fill={entry.fill} />
               ))}
@@ -264,7 +309,7 @@ export default function InternalClient({ data }) {
 
       <SectionLabel>Monthly Trends</SectionLabel>
 
-      <ChartCard eyebrow="Monthly Trend" title="Avg Call Duration">
+      <ChartCard eyebrow="Monthly Trend" title="Avg Call Duration" accentColor="#0d9488">
         <TrendLineChart
           data={durationTrend}
           color="#0d9488"
@@ -276,7 +321,7 @@ export default function InternalClient({ data }) {
       </ChartCard>
 
       <div className="grid grid-cols-2 gap-4">
-        <ChartCard eyebrow="Monthly Trend" title="Abandonment Rate">
+        <ChartCard eyebrow="Monthly Trend" title="Abandonment Rate" accentColor="#e11d48">
           <TrendLineChart
             data={abandonmentTrend}
             color="#e11d48"
@@ -285,7 +330,7 @@ export default function InternalClient({ data }) {
             yAxisProps={{ domain: [0, 100], unit: '%' }}
           />
         </ChartCard>
-        <ChartCard eyebrow="Monthly Trend" title="Escalation Rate">
+        <ChartCard eyebrow="Monthly Trend" title="Escalation Rate" accentColor="#d97706">
           <TrendLineChart
             data={escalationTrend}
             color="#d97706"
@@ -299,20 +344,88 @@ export default function InternalClient({ data }) {
   );
 }
 
-function PercentBarChart({ data, color, radius = [4, 4, 0, 0] }) {
+function PercentBarChart({ data, color, radius = [4, 4, 0, 0], isDark = false }) {
+  const [activeIndex, setActiveIndex] = useState(null);
+
+  const axisTickFill = isDark ? '#8b8696' : '#6b6575';
+  const axisStroke = isDark ? '#2a2a3a' : '#e8e3ed';
+  const gridStroke = isDark ? '#2a2a3a' : '#e8e3ed';
+  const tooltipBg = isDark ? '#16161f' : '#ffffff';
+  const tooltipBorder = isDark ? '#2a2a3a' : '#e8e3ed';
+  const tooltipColor = isDark ? '#f1eff5' : '#322D3C';
+  const cursorFill = isDark ? 'rgba(255,255,255,0.04)' : 'rgba(103,61,125,0.05)';
+
+  const axisTick = { fill: axisTickFill, fontSize: 11 };
+  const axisLine = { stroke: axisStroke };
+
   return (
-    <ResponsiveContainer width="100%" height={220}>
-      <BarChart data={data} margin={{ top: 4, right: 8, bottom: 4, left: 0 }}>
-        <CartesianGrid stroke={GRID_STROKE} strokeDasharray="3 3" vertical={false} />
-        <XAxis dataKey="name" tick={AXIS_TICK} axisLine={AXIS_LINE} tickLine={AXIS_LINE} />
-        <YAxis domain={[0, 100]} unit="%" tick={AXIS_TICK} axisLine={AXIS_LINE} tickLine={AXIS_LINE} />
+    <ResponsiveContainer width="100%" height={260}>
+      <BarChart data={data} margin={{ top: 32, right: 8, bottom: 4, left: 0 }}>
+        <CartesianGrid stroke={gridStroke} strokeDasharray="3 3" vertical={false} />
+        <XAxis dataKey="name" tick={axisTick} axisLine={axisLine} tickLine={axisLine} />
+        <YAxis domain={[0, 100]} unit="%" tick={axisTick} axisLine={axisLine} tickLine={axisLine} />
         <Tooltip
-          contentStyle={TOOLTIP_STYLE}
-          labelStyle={TOOLTIP_LABEL_STYLE}
-          formatter={pctTooltipFormatter}
-          cursor={TOOLTIP_CURSOR}
+          cursor={{ fill: cursorFill }}
+          content={({ active, payload, label }) => {
+            if (!active || !payload?.length) return null;
+            const d = payload[0]?.payload;
+            if (!d) return null;
+            return (
+              <div
+                style={{
+                  background: tooltipBg,
+                  border: `1px solid ${tooltipBorder}`,
+                  borderRadius: 8,
+                  padding: '10px 12px',
+                  fontFamily: 'var(--font-dm-sans), sans-serif',
+                  fontSize: 12,
+                  color: tooltipColor,
+                  lineHeight: 1.7,
+                }}
+              >
+                <div style={{ fontWeight: 600, marginBottom: 4 }}>{label}</div>
+                <div>Success Rate: <strong>{(d.successRate ?? 0).toFixed(1)}%</strong></div>
+                <div>Share of Calls: <strong>{(d.callShare ?? 0).toFixed(1)}%</strong></div>
+                <div>Total Calls: <strong>{(d.totalCalls ?? 0).toLocaleString()}</strong></div>
+              </div>
+            );
+          }}
         />
-        <Bar dataKey="value" fill={color} radius={radius} />
+        <Bar
+          dataKey="successRate"
+          radius={radius}
+          animationDuration={800}
+          animationEasing="ease-out"
+          onMouseEnter={(_, index) => setActiveIndex(index)}
+          onMouseLeave={() => setActiveIndex(null)}
+        >
+          {data.map((entry, index) => (
+            <Cell
+              key={`cell-${entry.name}`}
+              fill={color}
+              fillOpacity={activeIndex === null || activeIndex === index ? 1 : 0.4}
+            />
+          ))}
+          <LabelList
+            dataKey="callShare"
+            position="top"
+            content={({ x, y, width, value }) => {
+              if (value == null) return null;
+              return (
+                <text
+                  x={Number(x) + Number(width) / 2}
+                  y={Number(y) - 6}
+                  textAnchor="middle"
+                  fontSize={11}
+                  fill={axisTickFill}
+                  fontFamily="var(--font-dm-sans), sans-serif"
+                >
+                  {Number(value).toFixed(1)}%
+                </text>
+              );
+            }}
+          />
+        </Bar>
       </BarChart>
     </ResponsiveContainer>
   );
@@ -345,9 +458,11 @@ function TrendLineChart({ data, color, label, valueFormatter, yAxisProps, height
           dataKey="value"
           stroke={color}
           strokeWidth={2}
-          dot={{ r: 3, strokeWidth: 0 }}
-          activeDot={{ r: 4 }}
+          dot={{ r: 4, fill: color, strokeWidth: 0 }}
+          activeDot={{ r: 6, fill: color, stroke: '#ffffff', strokeWidth: 2 }}
           connectNulls={false}
+          animationDuration={800}
+          animationEasing="ease-out"
         />
       </LineChart>
     </ResponsiveContainer>

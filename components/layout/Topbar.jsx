@@ -7,7 +7,10 @@ export default function Topbar({ variant = 'internal', dealerName }) {
   const switchLabel = isDealership ? 'Internal View' : 'Dealership View';
 
   return (
-    <header className="sticky top-0 z-50 flex h-[60px] items-center justify-between bg-sl-purple px-6 text-white">
+    <header
+      className="sticky top-0 z-50 flex h-[60px] items-center justify-between bg-sl-purple px-6 text-white"
+      style={!isDealership ? { borderBottom: '1px solid rgba(103,61,125,0.4)' } : undefined}
+    >
       <div className="flex items-center gap-3">
         <span className="text-base font-bold tracking-tight font-sans">
           ShortLoop

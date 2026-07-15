@@ -5,6 +5,8 @@ import {
   ResponsiveContainer,
   BarChart,
   Bar,
+  Cell,
+  LabelList,
   LineChart,
   Line,
   XAxis,
@@ -18,7 +20,13 @@ import KPICard from '@/components/ui/KPICard';
 import ChartCard from '@/components/ui/ChartCard';
 import SectionLabel from '@/components/ui/SectionLabel';
 import { fmtMonth } from '@/lib/format';
-import { pctNum, fmtSecs, successRateByGroup, monthlyAvgTrend } from '@/lib/metrics';
+import {
+  pctNum,
+  fmtSecs,
+  successRateWithShare,
+  monthlyAvgTrend,
+  computeKPITrend,
+} from '@/lib/metrics';
 
 const AGENT_TYPES = ['Service AI', 'Sales AI', 'Outbound AI'];
 const CHANNELS = ['Call', 'Text', 'Email'];
@@ -58,13 +66,12 @@ const CAMPAIGN_TAG_COLORS = {
 };
 const DEFAULT_TAG_COLOR = { bg: '#f3f4f6', text: '#374151' };
 
-function pctTooltipFormatter(value) {
-  return [`${value.toFixed(1)}%`, 'Success Rate'];
-}
+const CREAM_CARD_STYLE = { borderColor: '#e8d5b7' };
 
 export default function DealershipClient({ data }) {
   const [selectedDealer, setSelectedDealer] = useState(null);
   const [selectedMonths, setSelectedMonths] = useState([]);
+  const [hoveredDealer, setHoveredDealer] = useState(null);
 
   const hasDealer = Boolean(selectedDealer);
 
@@ -114,28 +121,65 @@ export default function DealershipClient({ data }) {
   const abandonedRate = pctNum(abandonedCount, totalCalls);
   const escalatedRate = pctNum(escalatedCount, totalCalls);
 
+  const successTrend = useMemo(
+    () =>
+      hasDealer
+        ? computeKPITrend(
+            dealerRows, allMonths, selectedMonths,
+            (rows) => pctNum(rows.filter((r) => r.Success === 'Yes').length, rows.length),
+            true
+          )
+        : null,
+    [dealerRows, allMonths, selectedMonths, hasDealer]
+  );
+  const abandonedTrend = useMemo(
+    () =>
+      hasDealer
+        ? computeKPITrend(
+            dealerRows, allMonths, selectedMonths,
+            (rows) => pctNum(rows.filter((r) => r['Call Abandoned'] === 'Yes').length, rows.length),
+            false
+          )
+        : null,
+    [dealerRows, allMonths, selectedMonths, hasDealer]
+  );
+  const escalatedTrend = useMemo(
+    () =>
+      hasDealer
+        ? computeKPITrend(
+            dealerRows, allMonths, selectedMonths,
+            (rows) => pctNum(rows.filter((r) => r['Escalated to Human'] === 'Yes').length, rows.length),
+            false
+          )
+        : null,
+    [dealerRows, allMonths, selectedMonths, hasDealer]
+  );
+
   const agentTypeData = useMemo(
-    () => successRateByGroup(filteredRows, 'Type of Agent', AGENT_TYPES),
+    () => successRateWithShare(filteredRows, 'Type of Agent', AGENT_TYPES),
     [filteredRows]
   );
   const channelData = useMemo(
-    () => successRateByGroup(filteredRows, 'Channel', CHANNELS),
+    () => successRateWithShare(filteredRows, 'Channel', CHANNELS),
     [filteredRows]
   );
   const languageData = useMemo(
-    () => successRateByGroup(filteredRows, 'Language', LANGUAGES),
+    () => successRateWithShare(filteredRows, 'Language', LANGUAGES),
     [filteredRows]
   );
-
-  const timeOfDayData = useMemo(
-    () =>
-      TIME_SLOTS.map((slot) => {
-        const slotRows = filteredRows.filter((r) => getTimeSlot(r['Time']) === slot);
-        const successes = slotRows.filter((r) => r.Success === 'Yes').length;
-        return { name: slot, value: pctNum(successes, slotRows.length) };
-      }),
-    [filteredRows]
-  );
+  const timeOfDayData = useMemo(() => {
+    const total = filteredRows.length;
+    return TIME_SLOTS.map((slot) => {
+      const slotRows = filteredRows.filter((r) => getTimeSlot(r['Time']) === slot);
+      const successes = slotRows.filter((r) => r.Success === 'Yes').length;
+      return {
+        name: slot,
+        successRate: pctNum(successes, slotRows.length),
+        callShare: pctNum(slotRows.length, total),
+        totalCalls: slotRows.length,
+      };
+    });
+  }, [filteredRows]);
 
   const durationTrend = useMemo(
     () => monthlyAvgTrend(dealerRows, allMonths, selectedMonths, (r) => (r.duration_secs || 0) / 60),
@@ -219,17 +263,25 @@ export default function DealershipClient({ data }) {
           <div className="flex flex-wrap gap-2">
             {dealerships.map((name) => {
               const isSelected = name === selectedDealer;
+              const isHovered = !isSelected && hoveredDealer === name;
               return (
                 <button
                   key={name}
                   type="button"
                   onClick={() => toggleDealer(name)}
+                  onMouseEnter={() => setHoveredDealer(name)}
+                  onMouseLeave={() => setHoveredDealer(null)}
                   aria-pressed={isSelected}
                   className={`rounded-sl-pill border px-3 py-1.5 text-xs transition-colors ${
                     isSelected
                       ? 'border-sl-purple bg-sl-purple font-semibold text-white'
                       : 'border-sl-border bg-[#f7f5fb] text-sl-muted'
                   }`}
+                  style={{
+                    transform: isHovered ? 'translateY(-1px)' : undefined,
+                    boxShadow: isHovered ? '0 3px 8px rgba(103,61,125,0.15)' : undefined,
+                    transition: 'transform 150ms ease, box-shadow 150ms ease',
+                  }}
                 >
                   {name}
                 </button>
@@ -253,6 +305,7 @@ export default function DealershipClient({ data }) {
             sub={hasDealer ? 'in selected period' : 'select a dealership'}
             accent="#673D7D"
             bg="var(--sl-cream)"
+            cardStyle={CREAM_CARD_STYLE}
           />
           <KPICard
             label="Success Rate"
@@ -260,6 +313,8 @@ export default function DealershipClient({ data }) {
             sub={hasDealer ? `${successCount.toLocaleString()} successful` : 'select a dealership'}
             accent="#059669"
             bg="var(--sl-cream)"
+            trend={successTrend}
+            cardStyle={CREAM_CARD_STYLE}
           />
           <KPICard
             label="Avg Duration"
@@ -267,6 +322,7 @@ export default function DealershipClient({ data }) {
             sub={hasDealer ? 'per call' : 'select a dealership'}
             accent="#0d9488"
             bg="var(--sl-cream)"
+            cardStyle={CREAM_CARD_STYLE}
           />
           <KPICard
             label="Abandoned"
@@ -274,6 +330,8 @@ export default function DealershipClient({ data }) {
             sub={hasDealer ? `${abandonedCount.toLocaleString()} calls` : 'select a dealership'}
             accent="#e11d48"
             bg="var(--sl-cream)"
+            trend={abandonedTrend}
+            cardStyle={CREAM_CARD_STYLE}
           />
           <KPICard
             label="Escalated"
@@ -281,22 +339,24 @@ export default function DealershipClient({ data }) {
             sub={hasDealer ? `${escalatedCount.toLocaleString()} calls` : 'select a dealership'}
             accent="#d97706"
             bg="var(--sl-cream)"
+            trend={escalatedTrend}
+            cardStyle={CREAM_CARD_STYLE}
           />
         </div>
 
         <SectionLabel>Success Rates</SectionLabel>
 
         <div className="grid grid-cols-2 gap-4">
-          <ChartCard eyebrow="Success Rate" title="By Agent Type">
+          <ChartCard eyebrow="Success Rate" title="By Agent Type" accentColor="#673D7D">
             {hasDealer ? <PercentBarChart data={agentTypeData} color="#673D7D" /> : <EmptyState />}
           </ChartCard>
-          <ChartCard eyebrow="Success Rate" title="By Channel">
+          <ChartCard eyebrow="Success Rate" title="By Channel" accentColor="#0d9488">
             {hasDealer ? <PercentBarChart data={channelData} color="#0d9488" /> : <EmptyState />}
           </ChartCard>
-          <ChartCard eyebrow="Success Rate" title="By Language">
+          <ChartCard eyebrow="Success Rate" title="By Language" accentColor="#d97706">
             {hasDealer ? <PercentBarChart data={languageData} color="#d97706" /> : <EmptyState />}
           </ChartCard>
-          <ChartCard eyebrow="By Time of Day" title="Success Rate by Hour Slot">
+          <ChartCard eyebrow="By Time of Day" title="Success Rate by Hour Slot" accentColor="#8b5cf6">
             {hasDealer ? (
               <PercentBarChart data={timeOfDayData} color="#8b5cf6" radius={[6, 6, 6, 6]} />
             ) : (
@@ -307,7 +367,7 @@ export default function DealershipClient({ data }) {
 
         <SectionLabel>Monthly Trends</SectionLabel>
 
-        <ChartCard eyebrow="Monthly Trend" title="Avg Call Duration">
+        <ChartCard eyebrow="Monthly Trend" title="Avg Call Duration" accentColor="#0d9488">
           {hasDealer ? (
             <TrendLineChart
               data={durationTrend}
@@ -323,7 +383,7 @@ export default function DealershipClient({ data }) {
         </ChartCard>
 
         <div className="grid grid-cols-2 gap-4">
-          <ChartCard eyebrow="Monthly Trend" title="Abandonment Rate">
+          <ChartCard eyebrow="Monthly Trend" title="Abandonment Rate" accentColor="#e11d48">
             {hasDealer ? (
               <TrendLineChart
                 data={abandonmentTrend}
@@ -336,7 +396,7 @@ export default function DealershipClient({ data }) {
               <EmptyState />
             )}
           </ChartCard>
-          <ChartCard eyebrow="Monthly Trend" title="Escalation Rate">
+          <ChartCard eyebrow="Monthly Trend" title="Escalation Rate" accentColor="#d97706">
             {hasDealer ? (
               <TrendLineChart
                 data={escalationTrend}
@@ -353,7 +413,7 @@ export default function DealershipClient({ data }) {
 
         <SectionLabel>Outbound Campaigns</SectionLabel>
 
-        <ChartCard eyebrow="Outbound AI" title="Campaign Performance">
+        <ChartCard eyebrow="Outbound AI" title="Campaign Performance" accentColor="#673D7D">
           {!hasDealer ? (
             <EmptyState />
           ) : campaigns.length === 0 ? (
@@ -379,19 +439,76 @@ function EmptyState({ height = 220, message = 'Select a dealership above to view
 }
 
 function PercentBarChart({ data, color, radius = [4, 4, 0, 0] }) {
+  const [activeIndex, setActiveIndex] = useState(null);
+
   return (
-    <ResponsiveContainer width="100%" height={220}>
-      <BarChart data={data} margin={{ top: 4, right: 8, bottom: 4, left: 0 }}>
+    <ResponsiveContainer width="100%" height={260}>
+      <BarChart data={data} margin={{ top: 32, right: 8, bottom: 4, left: 0 }}>
         <CartesianGrid stroke={GRID_STROKE} strokeDasharray="3 3" vertical={false} />
         <XAxis dataKey="name" tick={AXIS_TICK} axisLine={AXIS_LINE} tickLine={AXIS_LINE} />
         <YAxis domain={[0, 100]} unit="%" tick={AXIS_TICK} axisLine={AXIS_LINE} tickLine={AXIS_LINE} />
         <Tooltip
-          contentStyle={TOOLTIP_STYLE}
-          labelStyle={TOOLTIP_LABEL_STYLE}
-          formatter={pctTooltipFormatter}
           cursor={TOOLTIP_CURSOR}
+          content={({ active, payload, label }) => {
+            if (!active || !payload?.length) return null;
+            const d = payload[0]?.payload;
+            if (!d) return null;
+            return (
+              <div
+                style={{
+                  background: '#ffffff',
+                  border: '1px solid #e8e3ed',
+                  borderRadius: 8,
+                  padding: '10px 12px',
+                  fontFamily: 'var(--font-dm-sans), sans-serif',
+                  fontSize: 12,
+                  color: '#322D3C',
+                  lineHeight: 1.7,
+                }}
+              >
+                <div style={{ fontWeight: 600, marginBottom: 4 }}>{label}</div>
+                <div>Success Rate: <strong>{(d.successRate ?? 0).toFixed(1)}%</strong></div>
+                <div>Share of Calls: <strong>{(d.callShare ?? 0).toFixed(1)}%</strong></div>
+                <div>Total Calls: <strong>{(d.totalCalls ?? 0).toLocaleString()}</strong></div>
+              </div>
+            );
+          }}
         />
-        <Bar dataKey="value" fill={color} radius={radius} />
+        <Bar
+          dataKey="successRate"
+          radius={radius}
+          animationDuration={800}
+          animationEasing="ease-out"
+          onMouseEnter={(_, index) => setActiveIndex(index)}
+          onMouseLeave={() => setActiveIndex(null)}
+        >
+          {data.map((entry, index) => (
+            <Cell
+              key={`cell-${entry.name}`}
+              fill={color}
+              fillOpacity={activeIndex === null || activeIndex === index ? 1 : 0.4}
+            />
+          ))}
+          <LabelList
+            dataKey="callShare"
+            position="top"
+            content={({ x, y, width, value }) => {
+              if (value == null) return null;
+              return (
+                <text
+                  x={Number(x) + Number(width) / 2}
+                  y={Number(y) - 6}
+                  textAnchor="middle"
+                  fontSize={11}
+                  fill="#6b6575"
+                  fontFamily="var(--font-dm-sans), sans-serif"
+                >
+                  {Number(value).toFixed(1)}%
+                </text>
+              );
+            }}
+          />
+        </Bar>
       </BarChart>
     </ResponsiveContainer>
   );
@@ -424,9 +541,11 @@ function TrendLineChart({ data, color, label, valueFormatter, yAxisProps, height
           dataKey="value"
           stroke={color}
           strokeWidth={2}
-          dot={{ r: 3, strokeWidth: 0 }}
-          activeDot={{ r: 4 }}
+          dot={{ r: 4, fill: color, strokeWidth: 0 }}
+          activeDot={{ r: 6, fill: color, stroke: '#ffffff', strokeWidth: 2 }}
           connectNulls={false}
+          animationDuration={800}
+          animationEasing="ease-out"
         />
       </LineChart>
     </ResponsiveContainer>
@@ -434,6 +553,8 @@ function TrendLineChart({ data, color, label, valueFormatter, yAxisProps, height
 }
 
 function CampaignTable({ campaigns }) {
+  const [hoveredCampaign, setHoveredCampaign] = useState(null);
+
   return (
     <div className="overflow-x-auto">
       <table className="w-full border-collapse text-sm">
@@ -451,8 +572,18 @@ function CampaignTable({ campaigns }) {
           {campaigns.map((c) => {
             const tagColor = CAMPAIGN_TAG_COLORS[c.type] || DEFAULT_TAG_COLOR;
             const barWidth = Math.min(100, Math.max(0, c.successRate));
+            const isHovered = hoveredCampaign === c.name;
             return (
-              <tr key={c.name} className="border-b border-sl-border last:border-0 hover:bg-[#f7f5fb]">
+              <tr
+                key={c.name}
+                className="border-b border-sl-border last:border-0 hover:bg-[#f7f5fb]"
+                onMouseEnter={() => setHoveredCampaign(c.name)}
+                onMouseLeave={() => setHoveredCampaign(null)}
+                style={{
+                  borderLeft: isHovered ? '3px solid #673D7D' : '3px solid transparent',
+                  transition: 'border-left-color 150ms',
+                }}
+              >
                 <td className="px-3 py-3 font-medium text-sl-text">{c.name}</td>
                 <td className="px-3 py-3">
                   <span

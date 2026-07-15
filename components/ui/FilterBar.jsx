@@ -32,7 +32,10 @@ export default function FilterBar({
   }
 
   return (
-    <div className="flex flex-wrap items-center justify-between gap-4 rounded-sl-card border border-sl-border bg-sl-card p-4">
+    <div
+      className="flex flex-wrap items-center justify-between gap-4 rounded-sl-card border border-sl-border p-4"
+      style={{ backgroundColor: 'var(--sl-filterbar-bg)' }}
+    >
       <div className="flex flex-wrap items-center gap-3">
         <span className="whitespace-nowrap text-[11px] uppercase tracking-[0.07em] text-sl-muted">
           Period
@@ -65,7 +68,7 @@ export default function FilterBar({
           onClick={handleApply}
           className="rounded-sl-button bg-sl-purple px-4 py-2 text-xs font-semibold text-white"
         >
-          Apply
+          Apply →
         </button>
         <button
           type="button"
@@ -75,9 +78,10 @@ export default function FilterBar({
           Clear
         </button>
         {statusText && (
-          <span className="whitespace-nowrap text-[11px] text-sl-muted">
-            {statusText}
-          </span>
+          <div className="flex items-center gap-2">
+            <span className="h-2 w-2 rounded-full bg-[#059669] animate-pulse" aria-hidden="true" />
+            <span className="whitespace-nowrap text-[11px] text-sl-muted">{statusText}</span>
+          </div>
         )}
       </div>
     </div>
