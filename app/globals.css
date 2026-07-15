@@ -1,0 +1,25 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --sl-purple: #673D7D;
+  --sl-purple-dark: #4a2a5a;
+  --sl-purple-light: #EDE8EF;
+  --sl-cream: #FDF0DD;
+  --sl-bg: #FFFFFF;
+  --sl-text: #322D3C;
+  --sl-muted: #6b6575;
+  --sl-border: #e8e3ed;
+
+  --sl-radius-button: 0px;
+  --sl-radius-button-secondary: 7px;
+  --sl-radius-card: 8px;
+  --sl-radius-pill: 4px;
+}
+
+body {
+  color: var(--sl-text);
+  background-color: var(--sl-bg);
+  font-family: var(--font-dm-sans), sans-serif;
+}
