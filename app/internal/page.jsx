@@ -2,6 +2,8 @@ import { getSheetData } from '@/lib/sheets';
 import Topbar from '@/components/layout/Topbar';
 import InternalClient from './InternalClient';
 
+export const revalidate = 60;
+
 export default async function InternalPage() {
   const data = await getSheetData();
 
