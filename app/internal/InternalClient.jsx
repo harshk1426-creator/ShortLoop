@@ -18,7 +18,7 @@ import KPICard from '@/components/ui/KPICard';
 import ChartCard from '@/components/ui/ChartCard';
 import SectionLabel from '@/components/ui/SectionLabel';
 import { fmtMonth } from '@/lib/format';
-import { pctNum, fmtSecs, fmtRevenue } from './utils';
+import { pctNum, fmtSecs, fmtRevenue, successRateByGroup, monthlyAvgTrend } from '@/lib/metrics';
 
 const AGENT_TYPES = ['Service AI', 'Sales AI', 'Outbound AI'];
 const CHANNELS = ['Call', 'Text', 'Email'];
@@ -42,26 +42,6 @@ const TOOLTIP_STYLE = {
 };
 const TOOLTIP_LABEL_STYLE = { color: '#f1eff5' };
 const TOOLTIP_CURSOR = { fill: 'rgba(255,255,255,0.04)' };
-
-function successRateByGroup(rows, field, groups) {
-  return groups.map((group) => {
-    const subset = rows.filter((r) => r[field] === group);
-    const successes = subset.filter((r) => r.Success === 'Yes').length;
-    return { name: group, value: pctNum(successes, subset.length) };
-  });
-}
-
-function monthlyRateTrend(rows, allMonths, selected, matchFn) {
-  return allMonths.map((month) => {
-    const included = selected.length === 0 || selected.includes(month);
-    const monthRows = rows.filter((r) => r.month === month);
-    if (!included || monthRows.length === 0) {
-      return { month, rate: null };
-    }
-    const matched = monthRows.filter(matchFn).length;
-    return { month, rate: pctNum(matched, monthRows.length) };
-  });
-}
 
 function pctTooltipFormatter(value) {
   return [`${value.toFixed(1)}%`, 'Success Rate'];
@@ -142,26 +122,17 @@ export default function InternalClient({ data }) {
   );
 
   const durationTrend = useMemo(
-    () =>
-      allMonths.map((month) => {
-        const included = selected.length === 0 || selected.includes(month);
-        const monthRows = data.filter((r) => r.month === month);
-        if (!included || monthRows.length === 0) {
-          return { month, minutes: null };
-        }
-        const avg = monthRows.reduce((acc, r) => acc + (r.duration_secs || 0), 0) / monthRows.length;
-        return { month, minutes: avg / 60 };
-      }),
-    [allMonths, data, selected]
+    () => monthlyAvgTrend(data, allMonths, selected, (r) => (r.duration_secs || 0) / 60),
+    [data, allMonths, selected]
   );
 
   const abandonmentTrend = useMemo(
-    () => monthlyRateTrend(data, allMonths, selected, (r) => r['Call Abandoned'] === 'Yes'),
+    () => monthlyAvgTrend(data, allMonths, selected, (r) => (r['Call Abandoned'] === 'Yes' ? 100 : 0)),
     [data, allMonths, selected]
   );
 
   const escalationTrend = useMemo(
-    () => monthlyRateTrend(data, allMonths, selected, (r) => r['Escalated to Human'] === 'Yes'),
+    () => monthlyAvgTrend(data, allMonths, selected, (r) => (r['Escalated to Human'] === 'Yes' ? 100 : 0)),
     [data, allMonths, selected]
   );
 
@@ -270,45 +241,34 @@ export default function InternalClient({ data }) {
       <SectionLabel>Monthly Trends</SectionLabel>
 
       <ChartCard eyebrow="Monthly Trend" title="Avg Call Duration">
-        <ResponsiveContainer width="100%" height={280}>
-          <LineChart data={durationTrend} margin={{ top: 4, right: 16, bottom: 24, left: 8 }}>
-            <CartesianGrid stroke={GRID_STROKE} strokeDasharray="3 3" vertical={false} />
-            <XAxis
-              dataKey="month"
-              tickFormatter={fmtMonth}
-              tick={AXIS_TICK}
-              axisLine={AXIS_LINE}
-              tickLine={AXIS_LINE}
-              angle={-35}
-              textAnchor="end"
-              height={56}
-            />
-            <YAxis unit="m" tick={AXIS_TICK} axisLine={AXIS_LINE} tickLine={AXIS_LINE} />
-            <Tooltip
-              contentStyle={TOOLTIP_STYLE}
-              labelStyle={TOOLTIP_LABEL_STYLE}
-              labelFormatter={fmtMonth}
-              formatter={(value) => [value == null ? '—' : `${value.toFixed(1)}m`, 'Avg Duration']}
-            />
-            <Line
-              type="monotone"
-              dataKey="minutes"
-              stroke="#0d9488"
-              strokeWidth={2}
-              dot={{ r: 3, strokeWidth: 0 }}
-              activeDot={{ r: 4 }}
-              connectNulls={false}
-            />
-          </LineChart>
-        </ResponsiveContainer>
+        <TrendLineChart
+          data={durationTrend}
+          color="#0d9488"
+          label="Avg Duration"
+          valueFormatter={(v) => `${v.toFixed(1)}m`}
+          yAxisProps={{ unit: 'm' }}
+          height={280}
+        />
       </ChartCard>
 
       <div className="grid grid-cols-2 gap-4">
         <ChartCard eyebrow="Monthly Trend" title="Abandonment Rate">
-          <RateLineChart data={abandonmentTrend} color="#e11d48" label="Abandonment Rate" />
+          <TrendLineChart
+            data={abandonmentTrend}
+            color="#e11d48"
+            label="Abandonment Rate"
+            valueFormatter={(v) => `${v.toFixed(1)}%`}
+            yAxisProps={{ domain: [0, 100], unit: '%' }}
+          />
         </ChartCard>
         <ChartCard eyebrow="Monthly Trend" title="Escalation Rate">
-          <RateLineChart data={escalationTrend} color="#d97706" label="Escalation Rate" />
+          <TrendLineChart
+            data={escalationTrend}
+            color="#d97706"
+            label="Escalation Rate"
+            valueFormatter={(v) => `${v.toFixed(1)}%`}
+            yAxisProps={{ domain: [0, 100], unit: '%' }}
+          />
         </ChartCard>
       </div>
     </div>
@@ -334,9 +294,9 @@ function PercentBarChart({ data, color }) {
   );
 }
 
-function RateLineChart({ data, color, label }) {
+function TrendLineChart({ data, color, label, valueFormatter, yAxisProps, height = 240 }) {
   return (
-    <ResponsiveContainer width="100%" height={240}>
+    <ResponsiveContainer width="100%" height={height}>
       <LineChart data={data} margin={{ top: 4, right: 16, bottom: 24, left: 8 }}>
         <CartesianGrid stroke={GRID_STROKE} strokeDasharray="3 3" vertical={false} />
         <XAxis
@@ -349,16 +309,16 @@ function RateLineChart({ data, color, label }) {
           textAnchor="end"
           height={56}
         />
-        <YAxis domain={[0, 100]} unit="%" tick={AXIS_TICK} axisLine={AXIS_LINE} tickLine={AXIS_LINE} />
+        <YAxis tick={AXIS_TICK} axisLine={AXIS_LINE} tickLine={AXIS_LINE} {...yAxisProps} />
         <Tooltip
           contentStyle={TOOLTIP_STYLE}
           labelStyle={TOOLTIP_LABEL_STYLE}
           labelFormatter={fmtMonth}
-          formatter={(value) => [value == null ? '—' : `${value.toFixed(1)}%`, label]}
+          formatter={(value) => [value == null ? '—' : valueFormatter(value), label]}
         />
         <Line
           type="monotone"
-          dataKey="rate"
+          dataKey="value"
           stroke={color}
           strokeWidth={2}
           dot={{ r: 3, strokeWidth: 0 }}
