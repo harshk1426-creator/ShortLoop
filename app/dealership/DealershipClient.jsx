@@ -23,6 +23,17 @@ import { pctNum, fmtSecs, successRateByGroup, monthlyAvgTrend } from '@/lib/metr
 const AGENT_TYPES = ['Service AI', 'Sales AI', 'Outbound AI'];
 const CHANNELS = ['Call', 'Text', 'Email'];
 const LANGUAGES = ['English', 'Spanish'];
+const TIME_SLOTS = ['12AM–6AM', '6AM–12PM', '12PM–6PM', '6PM–12AM'];
+
+function getTimeSlot(timeStr) {
+  if (!timeStr) return null;
+  const hour = parseInt(timeStr.split(':')[0], 10);
+  if (isNaN(hour)) return null;
+  if (hour < 6) return '12AM–6AM';
+  if (hour < 12) return '6AM–12PM';
+  if (hour < 18) return '12PM–6PM';
+  return '6PM–12AM';
+}
 
 const AXIS_TICK = { fill: '#6b6575', fontSize: 11 };
 const AXIS_LINE = { stroke: '#e8e3ed' };
@@ -113,6 +124,16 @@ export default function DealershipClient({ data }) {
   );
   const languageData = useMemo(
     () => successRateByGroup(filteredRows, 'Language', LANGUAGES),
+    [filteredRows]
+  );
+
+  const timeOfDayData = useMemo(
+    () =>
+      TIME_SLOTS.map((slot) => {
+        const slotRows = filteredRows.filter((r) => getTimeSlot(r['Time']) === slot);
+        const successes = slotRows.filter((r) => r.Success === 'Yes').length;
+        return { name: slot, value: pctNum(successes, slotRows.length) };
+      }),
     [filteredRows]
   );
 
@@ -265,7 +286,7 @@ export default function DealershipClient({ data }) {
 
         <SectionLabel>Success Rates</SectionLabel>
 
-        <div className="grid grid-cols-3 gap-4">
+        <div className="grid grid-cols-2 gap-4">
           <ChartCard eyebrow="Success Rate" title="By Agent Type">
             {hasDealer ? <PercentBarChart data={agentTypeData} color="#673D7D" /> : <EmptyState />}
           </ChartCard>
@@ -274,6 +295,13 @@ export default function DealershipClient({ data }) {
           </ChartCard>
           <ChartCard eyebrow="Success Rate" title="By Language">
             {hasDealer ? <PercentBarChart data={languageData} color="#d97706" /> : <EmptyState />}
+          </ChartCard>
+          <ChartCard eyebrow="By Time of Day" title="Success Rate by Hour Slot">
+            {hasDealer ? (
+              <PercentBarChart data={timeOfDayData} color="#8b5cf6" radius={[6, 6, 6, 6]} />
+            ) : (
+              <EmptyState />
+            )}
           </ChartCard>
         </div>
 
@@ -350,7 +378,7 @@ function EmptyState({ height = 220, message = 'Select a dealership above to view
   );
 }
 
-function PercentBarChart({ data, color }) {
+function PercentBarChart({ data, color, radius = [4, 4, 0, 0] }) {
   return (
     <ResponsiveContainer width="100%" height={220}>
       <BarChart data={data} margin={{ top: 4, right: 8, bottom: 4, left: 0 }}>
@@ -363,7 +391,7 @@ function PercentBarChart({ data, color }) {
           formatter={pctTooltipFormatter}
           cursor={TOOLTIP_CURSOR}
         />
-        <Bar dataKey="value" fill={color} radius={[4, 4, 0, 0]} />
+        <Bar dataKey="value" fill={color} radius={radius} />
       </BarChart>
     </ResponsiveContainer>
   );
